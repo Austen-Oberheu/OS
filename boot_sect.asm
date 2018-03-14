@@ -1,4 +1,3 @@
-[bits 16]
 [org 0x7c00]
 
 mov bp, 0x9000
