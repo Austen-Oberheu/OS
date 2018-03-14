@@ -1,53 +1,92 @@
-[org 0x7c00]
+bits 16
+org 0x7c00                  ; loaded at phys addr 0x7e00
+                            ; control must be transferred with jmp 0:0x7e00
 
-mov bp, 0x9000
-mov sp, bp
-mov bx, MSG_REAL_MODE
-call print_string
-call switch_to_pm
+    xor ax, ax
+    mov ds, ax              ; update data segment
 
-;jmp $
+    cli                     ; clear interrupts
 
-;mov [BOOT_DRIVE], dl
+    lgdt [gdtr]             ; load GDT from GDTR (see gdt_32.inc)
 
-;mov bp, 0x8000
-;mov sp, bp
+    call OpenA20Gate        ; open the A20 gate 
 
-;mov bx, 0x9000
-;mov dh, 5
-;mov dl, [BOOT_DRIVE]
-;call disk_load
+    call EnablePMode        ; jumps to ProtectedMode
 
+;******************
+;* Opens A20 Gate *
+;******************
+OpenA20Gate:
+    in al, 0x93         ; switch A20 gate via fast A20 port 92
 
-;jmp $
+    or al, 2            ; set A20 Gate bit 1
+    and al, ~1          ; clear INIT_NOW bit
+    out 0x92, al
 
-%include "print_string.asm"
-%include "gdt.asm"
+    ret
+
+;**************************
+;* Enables Protected Mode *
+;**************************
+EnablePMode:
+    mov eax, cr0
+    or eax, 1
+    mov cr0, eax
+
+    jmp (CODE_DESC - NULL_DESC) : ProtectedMode
+
+;***************
+;* data fields *
+;*  &includes  *
+;***************
+;%include "gdt_32.inc"
+;*********************************
+;* Global Descriptor Table (GDT) *
+;*********************************
+NULL_DESC:
+    dd 0            ; null descriptor
+    dd 0
+
+CODE_DESC:
+    dw 0xFFFF       ; limit low
+    dw 0            ; base low
+    db 0            ; base middle
+    db 10011010b    ; access
+    db 11001111b    ; granularity
+    db 0            ; base high
+
+DATA_DESC:
+    dw 0xFFFF       ; limit low
+    dw 0            ; base low
+    db 0            ; base middle
+    db 10010010b    ; access
+    db 11001111b    ; granularity
+    db 0            ; base high
+
+gdtr:
+    Limit dw gdtr - NULL_DESC - 1 ; length of GDT
+    Base dd NULL_DESC   ; base of GDT
+
+;******************
+;* Protected Mode *
+;******************
 %include "print_string_pm.asm"
-;%include "print_hex.asm"
-;%include "disk_load.asm"
-%include "switch_to_pm.asm"
 
-[bits 32]
+bits 32
 
-BEGIN_PM:
+ProtectedMode:
+    mov     ax, DATA_DESC - NULL_DESC
+    mov     ds, ax ; update data segment
+	
 	mov ebx, MSG_PROT_MODE
 	call print_string_pm
-	
-	jmp $
 
-HELLO_MSG:
-	db 'Booting OS', 0
-BOOT_DRIVE:
-	db 0
-MSG_REAL_MODE:
-	db 'Started in 16-bit Real Mode', 0
+    jmp $
+	
+	
 MSG_PROT_MODE:
 	db 'Successfully landed in 32-bit Protected Mode', 0
 
 times 510-($-$$) db 0
 
 dw 0xaa55
-
-;times 256 dw 0xdada
-;times 256 dw 0xface
