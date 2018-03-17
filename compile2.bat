@@ -1,0 +1,1 @@
+i686-elf-g++ -c C:\Users\auste\source\repos\OS_Kernel\OS_Kernel\kernel.cc -o kernel.o -ffreestanding -O2 -Wall -Wextra -fno-exceptions -fno-rtti
